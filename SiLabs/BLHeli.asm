@@ -1512,9 +1512,9 @@ DEFAULT_PGM_MAIN_COMM_TIMING		EQU 3 	; 1=Low 		2=MediumLow 	3=Medium 		4=MediumH
 DEFAULT_PGM_MAIN_THROTTLE_RATE	EQU 13	; 1=2		2=3			3=4			4=6 			5=8	 	6=12 	7=16	  8=24  9=32  10=48  11=64  12=128 13=255
 DEFAULT_PGM_MAIN_DAMPING_FORCE	EQU 1 	; 1=VeryLow 	2=Low 		3=MediumLow 	4=MediumHigh 	5=High	6=Highest
 IF DAMPED_MODE_ENABLE == 1
-DEFAULT_PGM_MAIN_PWM_FREQ 		EQU 2 	; 1=High 		2=Low		3=DampedLight
+DEFAULT_PGM_MAIN_PWM_FREQ 		EQU 3 	; 1=High 		2=Low		3=DampedLight
 ELSE
-DEFAULT_PGM_MAIN_PWM_FREQ 		EQU 2 	; 1=High 		2=Low	
+DEFAULT_PGM_MAIN_PWM_FREQ 		EQU 3 	; 1=High 		2=Low	
 ENDIF
 DEFAULT_PGM_MAIN_DEMAG_COMP 		EQU 1 	; 1=Disabled	2=Low		3=High
 DEFAULT_PGM_MAIN_DIRECTION		EQU 1 	; 1=Normal 	2=Reversed
@@ -2934,6 +2934,7 @@ pca_int_store_data:
 
 pca_int_fall:
 	; RC pulse edge was second, calculate new pulse length
+
 	clr	C
 	mov	A, Temp1
 	subb	A, Rcp_Prev_Edge_L	
@@ -2941,6 +2942,7 @@ pca_int_fall:
 	mov	A, Temp2
 	subb	A, Rcp_Prev_Edge_H
 	mov	Temp2, A
+
 	jnb	Flags3.RCP_PWM_FREQ_12KHZ, ($+5)	; Is RC input pwm frequency 12kHz?
 	ajmp	pca_int_pwm_divide_done			; Yes - branch forward
 
@@ -2979,16 +2981,17 @@ pca_int_fall:
 	mov	A, Temp1					
 	rrc	A
 	mov	Temp5, A
-	; Skip range limitation if pwm frequency measurement
+
+	;Skip range limitation if pwm frequency measurement
 	jb	Flags0.RCP_MEAS_PWM_FREQ, pca_int_ppm_check_full_range 		
 
 	; Check if 2160us or above (in order to ignore false pulses)
 	clr	C
-	mov	A, Temp5						; Is pulse 2160us or higher?
+	mov	A, Temp5							; Is pulse 2160us or higher?
 	subb	A, #28
 	mov	A, Temp6
 	subb A, #2
-	jc	($+4)						; No - proceed
+	jc	($+4) 		; No - proceed
 
 	ajmp	pca_int_ppm_outside_range		; Yes - ignore pulse
 
@@ -3001,6 +3004,54 @@ pca_int_ppm_below_full_range:
 	mov	A, Temp5						; Is pulse below 800us?
 	subb	A, #200
 	jnc	pca_int_ppm_check_full_range		; No - proceed
+
+; OneShot125 hack below
+	; Pulse is below 800 which means it might be OneShot125.
+	; Restore original Temp1 and Temp2 (undivided) to Temp5 and Temp6 and check again
+
+	mov	A, Temp5		; multiply by 2
+	clr	C
+	rlc	A
+	mov	Temp1, A
+	mov	A, Temp6
+	rlc	A
+	mov	Temp2, A
+
+	mov	A, Temp1		; multiply by 2
+	clr	C
+	rlc	A
+	mov	Temp1, A
+	mov	A, Temp2
+	rlc	A
+	mov	Temp2, A
+
+	mov	A, Temp1		; multiply by 2
+	clr	C
+	rlc	A
+	mov	Temp5, A
+	mov	A, Temp2
+	rlc	A
+	mov	Temp6, A
+
+	; Check if 2160us or above (in order to ignore false pulses)
+	clr	C
+	mov	A, Temp5							; Is pulse 2160us or higher?
+	subb	A, #28
+	mov	A, Temp6
+	subb A, #2
+	jc	($+4) 		; No - proceed
+
+	ajmp	pca_int_ppm_outside_range		; Yes - ignore pulse
+
+	; Check if below 800us (in order to ignore false pulses)
+	mov	A, Temp6
+	jnz	pca_int_ppm_check_full_range
+
+	clr	C
+	mov	A, Temp5						; Is pulse below 800us?
+	subb	A, #200
+	jnc	pca_int_ppm_check_full_range		; No - proceed
+;OneShot125 hack above
 
 pca_int_ppm_outside_range:
 	inc	Rcp_Outside_Range_Cnt

@@ -2295,6 +2295,38 @@ rcp_int_fall:
 	subi	XL, 200
 	brcc	rcp_int_ppm_check_full_range		; No - branch
 
+; OneShot125 hack below
+	; Pulse is below 800 which means it might be OneShot125.
+	; Multiply I_Temp5/6 back up to the original number
+
+	lsl	I_Temp5						; Multiply value by 2
+	rol	I_Temp6
+
+	lsl	I_Temp5						; Multiply value by 2
+	rol	I_Temp6
+
+	lsl	I_Temp5						; Multiply value by 2
+	rol	I_Temp6
+
+	; Check if 2160us or above (in order to ignore false pulses)
+	mov	XL, I_Temp5					; Is pulse 2160us or higher?
+	subi	XL, 28
+	mov	XL, I_Temp6
+	sbci	XL, 2
+	brcs	PC+2
+
+	rjmp	pca_int_ppm_outside_range		; Yes - ignore pulse
+
+	; Check if below 800us (in order to ignore false pulses)
+	tst	I_Temp6
+	brne	rcp_int_ppm_check_full_range
+
+	mov	XL, I_Temp5					; Is pulse below 800us?
+	subi	XL, 200
+	brcc	rcp_int_ppm_check_full_range		; No - branch
+
+;OneShot125 hack above
+
 pca_int_ppm_outside_range:
 	lds	XL, Rcp_Outside_Range_Cnt
 	inc	XL
