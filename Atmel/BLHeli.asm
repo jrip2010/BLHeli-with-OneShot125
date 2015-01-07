@@ -2249,26 +2249,68 @@ rcp_int_fall:
 	sub	I_Temp1, XL
 	lds	XL, Rcp_Prev_Edge_H
 	sbc	I_Temp2, XL
-	sbrc	Flags3, RCP_PWM_FREQ_12KHZ		; Is RC input pwm frequency 12kHz?
-	rjmp	rcp_int_pwm_divide_done			; Yes - branch forward
 
-	sbrc	Flags3, RCP_PWM_FREQ_8KHZ		; Is RC input pwm frequency 8kHz?
-	rjmp	rcp_int_pwm_divide_done			; Yes - branch forward
+;; Oneshot125 hack
+	; Skip range limitation if pwm frequency measurement
+	sbrc	Flags0, RCP_MEAS_PWM_FREQ
+	rjmp	rcp_skip_oneshot 		
 
-	sbrc	Flags3, RCP_PWM_FREQ_4KHZ		; Is RC input pwm frequency 4kHz?
-	rjmp	rcp_int_pwm_divide				; Yes - branch forward
+	mov	XL, I_Temp1
+	subi XL, 100
+	mov	I_Temp1, XL
+	mov	XL, I_Temp2
+	sbci XL, 0
+	mov	I_Temp2, XL
+
+	mov	I_Temp6, I_Temp2				; Move to I_Temp5/6
+	mov	I_Temp5, I_Temp1
+
+;520 = I_Temp6 = 0000 0010 (2) I_Temp5 = 0000 1000 (8) //pass
+;541 = I_Temp6 = 0000 0010 (2) I_Temp5 = 0001 1101 (29) //fail
+;540 = I_Temp6 = 0000 0010 (2) I_Temp5 = 0001 1100 (28) //fail
+;539 = I_Temp6 = 0000 0010 (2) I_Temp5 = 0001 1011 (27) //pass
+;258 = I_Temp6 = 0000 0001 (1) I_Temp5 = 0000 0010 (2) //pass
+
+	; Check if 270us or above (in order to ignore false pulses)
+	mov	XL, I_Temp5					; Is pulse 270us or higher?
+	subi	XL, 28
+	mov	XL, I_Temp6
+	sbci	XL, 2
+	brcs	PC+2
+
+	rjmp	rcp_skip_oneshot		; Yes - Not Oneshot
+
+	; Check if below 800us (in order to ignore false pulses)
+	tst	I_Temp6
+	brne	rcp_int_ppm_check_full_range ;If I_Temp6 is higher than 0 than pulse is higher than 800.  
+
+	mov	XL, I_Temp5					; Is pulse below 800us?
+	subi	XL, 200
+	brcc	rcp_int_ppm_check_full_range		; No - branch
+
+rcp_skip_oneshot:
+;; OneShot125 hack
+
+;	sbrc	Flags3, RCP_PWM_FREQ_12KHZ		; Is RC input pwm frequency 12kHz?
+;	rjmp	rcp_int_pwm_divide_done			; Yes - branch forward
+
+;	sbrc	Flags3, RCP_PWM_FREQ_8KHZ		; Is RC input pwm frequency 8kHz?
+;	rjmp	rcp_int_pwm_divide_done			; Yes - branch forward
+
+;	sbrc	Flags3, RCP_PWM_FREQ_4KHZ		; Is RC input pwm frequency 4kHz?
+;	rjmp	rcp_int_pwm_divide				; Yes - branch forward
 
 	lsr	I_Temp2						; No - 2kHz. Divide by 2
 	ror	I_Temp1
 
-	sbrc	Flags3, RCP_PWM_FREQ_2KHZ		; Is RC input pwm frequency 2kHz?
-	rjmp	rcp_int_pwm_divide				; Yes - branch forward
+;	sbrc	Flags3, RCP_PWM_FREQ_2KHZ		; Is RC input pwm frequency 2kHz?
+;	rjmp	rcp_int_pwm_divide				; Yes - branch forward
 
 	lsr	I_Temp2						; No - 1kHz. Divide by 2 again
 	ror	I_Temp1
 
-	sbrc	Flags3, RCP_PWM_FREQ_1KHZ		; Is RC input pwm frequency 1kHz?
-	rjmp	rcp_int_pwm_divide				; Yes - branch forward
+;	sbrc	Flags3, RCP_PWM_FREQ_1KHZ		; Is RC input pwm frequency 1kHz?
+;	rjmp	rcp_int_pwm_divide				; Yes - branch forward
 
 	mov	I_Temp6, I_Temp2				; No - PPM. Divide by 2 (to bring range to 256) and move to I_Temp5/6
 	mov	I_Temp5, I_Temp1
@@ -2294,38 +2336,6 @@ rcp_int_fall:
 	mov	XL, I_Temp5					; Is pulse below 800us?
 	subi	XL, 200
 	brcc	rcp_int_ppm_check_full_range		; No - branch
-
-; OneShot125 hack below
-	; Pulse is below 800 which means it might be OneShot125.
-	; Multiply I_Temp5/6 back up to the original number
-
-	lsl	I_Temp5						; Multiply value by 2
-	rol	I_Temp6
-
-	lsl	I_Temp5						; Multiply value by 2
-	rol	I_Temp6
-
-	lsl	I_Temp5						; Multiply value by 2
-	rol	I_Temp6
-
-	; Check if 2160us or above (in order to ignore false pulses)
-	mov	XL, I_Temp5					; Is pulse 2160us or higher?
-	subi	XL, 28
-	mov	XL, I_Temp6
-	sbci	XL, 2
-	brcs	PC+2
-
-	rjmp	pca_int_ppm_outside_range		; Yes - ignore pulse
-
-	; Check if below 800us (in order to ignore false pulses)
-	tst	I_Temp6
-	brne	rcp_int_ppm_check_full_range
-
-	mov	XL, I_Temp5					; Is pulse below 800us?
-	subi	XL, 200
-	brcc	rcp_int_ppm_check_full_range		; No - branch
-
-;OneShot125 hack above
 
 pca_int_ppm_outside_range:
 	lds	XL, Rcp_Outside_Range_Cnt
@@ -2475,18 +2485,18 @@ rcp_int_pwm_divide:
 	ror	I_Temp1
 
 rcp_int_pwm_divide_done:
-	sbrs	Flags3, RCP_PWM_FREQ_12KHZ		; Is RC input pwm frequency 12kHz?
-	rjmp	rcp_int_check_legal_range	
-
-	tst	I_Temp2						; Yes - check that value is not more than 255
-	breq	PC+2
-
-	ldi	I_Temp1, RCP_MAX
-
-	mov	XL, I_Temp1					; Multiply by 1.5				
-	lsr	XL
-	add	I_Temp1, XL
-	adc	I_Temp2, Zero
+;	sbrs	Flags3, RCP_PWM_FREQ_12KHZ		; Is RC input pwm frequency 12kHz?
+;	rjmp	rcp_int_check_legal_range	
+;
+;	tst	I_Temp2						; Yes - check that value is not more than 255
+;	breq	PC+2
+;
+;	ldi	I_Temp1, RCP_MAX
+;
+;	mov	XL, I_Temp1					; Multiply by 1.5				
+;	lsr	XL
+;	add	I_Temp1, XL
+;	adc	I_Temp2, Zero
 
 rcp_int_check_legal_range:
 	; Check that RC pulse is within legal range
