@@ -2250,26 +2250,21 @@ rcp_int_fall:
 	lds	XL, Rcp_Prev_Edge_H
 	sbc	I_Temp2, XL
 
-;; Oneshot125 hack
+	;; Oneshot125
 	; Skip range limitation if pwm frequency measurement
 	sbrc	Flags0, RCP_MEAS_PWM_FREQ
 	rjmp	rcp_skip_oneshot 		
 
-	mov	XL, I_Temp1
+	;throttle offset fix. 
+	mov	XL, I_Temp1 ;Add 400 µS to the signal.
 	subi XL, 100
 	mov	I_Temp1, XL
 	mov	XL, I_Temp2
 	sbci XL, 0
 	mov	I_Temp2, XL
 
-	mov	I_Temp6, I_Temp2				; Move to I_Temp5/6
+	mov	I_Temp6, I_Temp2			; Move to I_Temp5/6
 	mov	I_Temp5, I_Temp1
-
-;520 = I_Temp6 = 0000 0010 (2) I_Temp5 = 0000 1000 (8) //pass
-;541 = I_Temp6 = 0000 0010 (2) I_Temp5 = 0001 1101 (29) //fail
-;540 = I_Temp6 = 0000 0010 (2) I_Temp5 = 0001 1100 (28) //fail
-;539 = I_Temp6 = 0000 0010 (2) I_Temp5 = 0001 1011 (27) //pass
-;258 = I_Temp6 = 0000 0001 (1) I_Temp5 = 0000 0010 (2) //pass
 
 	; Check if 270us or above (in order to ignore false pulses)
 	mov	XL, I_Temp5					; Is pulse 270us or higher?
@@ -2278,7 +2273,7 @@ rcp_int_fall:
 	sbci	XL, 2
 	brcs	PC+2
 
-	rjmp	rcp_skip_oneshot		; Yes - Not Oneshot
+	rjmp	rcp_skip_oneshot		; Yes - Not OneShot125
 
 	; Check if below 800us (in order to ignore false pulses)
 	tst	I_Temp6
@@ -2289,7 +2284,6 @@ rcp_int_fall:
 	brcc	rcp_int_ppm_check_full_range		; No - branch
 
 rcp_skip_oneshot:
-;; OneShot125 hack
 
 ;	sbrc	Flags3, RCP_PWM_FREQ_12KHZ		; Is RC input pwm frequency 12kHz?
 ;	rjmp	rcp_int_pwm_divide_done			; Yes - branch forward

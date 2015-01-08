@@ -2943,6 +2943,36 @@ pca_int_fall:
 	subb	A, Rcp_Prev_Edge_H
 	mov	Temp2, A
 
+	;;OneShot125
+
+	;Skip range limitation if pwm frequency measurement
+	jb	Flags0.RCP_MEAS_PWM_FREQ, rcp_skip_oneshot 		
+
+	mov	Temp5, Temp1					; Move to Temp5/6
+	mov	Temp6, Temp2
+
+	; Check if 270us or above (in order to ignore false pulses)
+	clr	C
+	mov	A, Temp5						; Is pulse 270us or higher?
+	subb	A, #28
+	mov	A, Temp6
+	subb A, #2
+	jc	pca_int_ppm_below_full_range_os	; No - proceed
+
+	ajmp	rcp_skip_oneshot			; Yes - Not OneShot125
+
+pca_int_ppm_below_full_range_os:
+	; Check if below 800us (in order to ignore false pulses)
+	mov	A, Temp6
+	jnz	pca_int_ppm_check_full_range	; No - Valid OneShot125 Signal - proceed
+
+	clr	C
+	mov	A, Temp5						; Is pulse below 800us?
+	subb	A, #200
+	jnc	pca_int_ppm_check_full_range	; No - Valid OneShot125 Signal - proceed
+
+rcp_skip_oneshot:
+
 	jnb	Flags3.RCP_PWM_FREQ_12KHZ, ($+5)	; Is RC input pwm frequency 12kHz?
 	ajmp	pca_int_pwm_divide_done			; Yes - branch forward
 
@@ -3004,54 +3034,6 @@ pca_int_ppm_below_full_range:
 	mov	A, Temp5						; Is pulse below 800us?
 	subb	A, #200
 	jnc	pca_int_ppm_check_full_range		; No - proceed
-
-; OneShot125 hack below
-	; Pulse is below 800 which means it might be OneShot125.
-	; Restore original Temp1 and Temp2 (undivided) to Temp5 and Temp6 and check again
-
-	mov	A, Temp5		; multiply by 2
-	clr	C
-	rlc	A
-	mov	Temp1, A
-	mov	A, Temp6
-	rlc	A
-	mov	Temp2, A
-
-	mov	A, Temp1		; multiply by 2
-	clr	C
-	rlc	A
-	mov	Temp1, A
-	mov	A, Temp2
-	rlc	A
-	mov	Temp2, A
-
-	mov	A, Temp1		; multiply by 2
-	clr	C
-	rlc	A
-	mov	Temp5, A
-	mov	A, Temp2
-	rlc	A
-	mov	Temp6, A
-
-	; Check if 2160us or above (in order to ignore false pulses)
-	clr	C
-	mov	A, Temp5							; Is pulse 2160us or higher?
-	subb	A, #28
-	mov	A, Temp6
-	subb A, #2
-	jc	($+4) 		; No - proceed
-
-	ajmp	pca_int_ppm_outside_range		; Yes - ignore pulse
-
-	; Check if below 800us (in order to ignore false pulses)
-	mov	A, Temp6
-	jnz	pca_int_ppm_check_full_range
-
-	clr	C
-	mov	A, Temp5						; Is pulse below 800us?
-	subb	A, #200
-	jnc	pca_int_ppm_check_full_range		; No - proceed
-;OneShot125 hack above
 
 pca_int_ppm_outside_range:
 	inc	Rcp_Outside_Range_Cnt
