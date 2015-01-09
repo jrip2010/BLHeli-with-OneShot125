@@ -2256,7 +2256,7 @@ rcp_int_fall:
 	rjmp	rcp_skip_oneshot 		
 
 	;throttle offset fix. 
-;	mov	XL, I_Temp1 ;Add 400 µS to the signal.
+;	mov	XL, I_Temp1 ;Remove 400 µS to the signal.
 ;	subi XL, 100
 ;	mov	I_Temp1, XL
 ;	mov	XL, I_Temp2
@@ -2275,11 +2275,11 @@ rcp_int_fall:
 
 	rjmp	rcp_skip_oneshot		; Yes - Not OneShot125
 
-	; Check if below 800us (in order to ignore false pulses)
+	; Check if below 100us (in order to ignore false pulses)
 	tst	I_Temp6
-	brne	rcp_int_ppm_check_full_range ;If I_Temp6 is higher than 0 than pulse is higher than 800.  
+	brne	rcp_int_ppm_check_full_range ;If I_Temp6 is higher than 0 than pulse is higher than 100.  
 
-	mov	XL, I_Temp5					; Is pulse below 800us?
+	mov	XL, I_Temp5					; Is pulse below 100us?
 	subi	XL, 200
 	brcc	rcp_int_ppm_check_full_range		; No - branch
 

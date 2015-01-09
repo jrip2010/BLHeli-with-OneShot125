@@ -2944,7 +2944,6 @@ pca_int_fall:
 	mov	Temp2, A
 
 	;;OneShot125
-
 	;Skip range limitation if pwm frequency measurement
 	jb	Flags0.RCP_MEAS_PWM_FREQ, rcp_skip_oneshot 		
 
@@ -2962,12 +2961,12 @@ pca_int_fall:
 	ajmp	rcp_skip_oneshot			; Yes - Not OneShot125
 
 pca_int_ppm_below_full_range_os:
-	; Check if below 800us (in order to ignore false pulses)
+	; Check if below 100us (in order to ignore false pulses)
 	mov	A, Temp6
 	jnz	pca_int_ppm_check_full_range	; No - Valid OneShot125 Signal - proceed
 
 	clr	C
-	mov	A, Temp5						; Is pulse below 800us?
+	mov	A, Temp5						; Is pulse below 100us?
 	subb	A, #200
 	jnc	pca_int_ppm_check_full_range	; No - Valid OneShot125 Signal - proceed
 
