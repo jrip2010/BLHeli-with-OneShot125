@@ -2256,12 +2256,12 @@ rcp_int_fall:
 	rjmp	rcp_skip_oneshot 		
 
 	;throttle offset fix. 
-	mov	XL, I_Temp1 ;Add 400 µS to the signal.
-	subi XL, 100
-	mov	I_Temp1, XL
-	mov	XL, I_Temp2
-	sbci XL, 0
-	mov	I_Temp2, XL
+;	mov	XL, I_Temp1 ;Add 400 µS to the signal.
+;	subi XL, 100
+;	mov	I_Temp1, XL
+;	mov	XL, I_Temp2
+;	sbci XL, 0
+;	mov	I_Temp2, XL
 
 	mov	I_Temp6, I_Temp2			; Move to I_Temp5/6
 	mov	I_Temp5, I_Temp1
