@@ -2947,8 +2947,10 @@ pca_int_fall:
 	;Skip range limitation if pwm frequency measurement
 	jb	Flags0.RCP_MEAS_PWM_FREQ, rcp_skip_oneshot 		
 
-	mov	Temp5, Temp1					; Move to Temp5/6
-	mov	Temp6, Temp2
+	mov	A, Temp2						; Move to Temp5/6
+	mov	Temp6, A
+	mov	A, Temp1					
+	mov	Temp5, A
 
 	; Check if 270us or above (in order to ignore false pulses)
 	clr	C
